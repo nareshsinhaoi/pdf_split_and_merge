@@ -1,0 +1,7 @@
+# requirements.txt
+Flask==3.0.0
+pymongo==4.6.1
+PyMuPDF>=1.26.6   # Latest version with Python 3.14 wheels
+python-dotenv==1.0.0
+Werkzeug==3.0.1
+waitress==3.0.0

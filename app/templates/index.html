@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Merger</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="container header-inner">
+      <h1 class="logo">📄 PDF&nbsp;Merger</h1>
+      <div class="header-actions">
+        <span id="projectLabel" class="project-label" hidden></span>
+        <button id="newProjectBtn" class="btn btn-secondary" type="button">New Project</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Upload area -->
+    <section id="uploadSection" class="card">
+      <div id="dropZone" class="drop-zone" tabindex="0">
+        <div class="drop-zone-inner">
+          <div class="drop-icon">⬆️</div>
+          <p class="drop-title">Drag &amp; Drop PDF Files Here</p>
+          <p class="drop-sub">or</p>
+          <button id="selectFilesBtn" class="btn btn-primary" type="button">Select PDF Files</button>
+          <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden />
+          <p class="drop-hint">Only PDF files. Max total upload size 100&nbsp;MB.</p>
+        </div>
+      </div>
+      <div id="uploadProgress" class="progress" hidden>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <span id="progressText" class="progress-text">Uploading…</span>
+      </div>
+    </section>
+
+    <!-- Toolbar -->
+    <section id="toolbar" class="card toolbar" hidden>
+      <div class="toolbar-left">
+        <strong id="pageCountLabel">0 pages</strong>
+        <span id="selectedCount" class="muted" hidden></span>
+      </div>
+      <div class="toolbar-right">
+        <button id="addMoreBtn" class="btn btn-secondary" type="button">+ Add PDF</button>
+        <button id="undoDeleteBtn" class="btn btn-secondary" type="button" hidden>↩ Undo Delete</button>
+        <button id="mergeBtn" class="btn btn-primary" type="button">🔗 Merge &amp; Create PDF</button>
+      </div>
+    </section>
+
+    <!-- Pages area -->
+    <section id="pagesSection" class="pages-section" hidden>
+      <div id="pagesGrid" class="pages-grid"></div>
+    </section>
+
+    <!-- Success panel -->
+    <section id="successSection" class="card success-card" hidden>
+      <h2>✅ PDF created successfully!</h2>
+      <p id="successInfo" class="muted"></p>
+      <a id="downloadLink" class="btn btn-primary" href="#" download>⬇ Download Final PDF</a>
+    </section>
+  </main>
+
+  <!-- Preview modal -->
+  <div id="previewModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-body">
+      <div class="modal-header">
+        <span id="previewTitle">Preview</span>
+        <div class="modal-controls">
+          <button id="prevPageBtn" class="btn btn-icon" title="Previous">‹</button>
+          <button id="zoomOutBtn" class="btn btn-icon" title="Zoom out">−</button>
+          <button id="zoomInBtn" class="btn btn-icon" title="Zoom in">+</button>
+          <button id="nextPageBtn" class="btn btn-icon" title="Next">›</button>
+          <button id="closePreviewBtn" class="btn btn-icon" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="modal-image-wrap">
+        <img id="previewImage" alt="Page preview" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

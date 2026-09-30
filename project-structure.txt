@@ -1,0 +1,36 @@
+pdf-merger/
+├── venv/
+├── app/
+│   ├── __init__.py	D
+│   ├── config.py  	D
+│   ├── routes/
+│   │   ├── __init__.py			D
+│   │   ├── project_routes.py	D
+│   │   ├── upload_routes.py	D
+│   │   ├── page_routes.py		D
+│   │   └── merge_routes.py		D
+│   ├── services/
+│   │   ├── __init__.py			D
+│   │   ├── pdf_service.py		D
+│   │   ├── file_service.py		D
+│   │   └── project_service.py	D
+│   ├── models/
+│   │   ├── __init__.py 		D
+│   │   ├── project.py 			D
+│   │   ├── file.py				D
+│   │   └── page.py				D
+│   ├── templates/
+│   │   └── index.html			D
+│   └── static/
+│       ├── css/
+│       │   └── style.css		D
+│       └── js/
+│           └── app.js			D
+├── uploads/
+├── outputs/
+├── .env
+├── .env.example
+├── .gitignore
+├── requirements.txt
+├── run.py
+└── README.md
