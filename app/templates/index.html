@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>PDF Merger</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
   <header class="app-header">
-    <div class="container header-inner">
+    <div class="container header-inner" style="min-height:50px;">
       <h1 class="logo">📄 PDF&nbsp;Merger</h1>
       <div class="header-actions">
         <span id="projectLabel" class="project-label" hidden></span>
@@ -17,7 +17,7 @@
     </div>
   </header>
 
-  <main class="container">
+  <main class="container" style="min-height:720px;margin-bottom:0px !important">
     <!-- Upload area -->
     <section id="uploadSection" class="card">
       <div id="dropZone" class="drop-zone" tabindex="0">
@@ -62,6 +62,16 @@
     </section>
   </main>
 
+  <!-- Footer -->
+  <footer class="app-footer"> 
+    <div class="footer-bottom">
+      <div class="container footer-bottom-inner">
+        <span>&copy; <span id="footerYear"></span> PDF Merger. All rights reserved.</span>
+        <span class="footer-version">@nareshsinha / v1.0</span>
+      </div>
+    </div>
+  </footer>
+
   <!-- Preview modal -->
   <div id="previewModal" class="modal" hidden>
     <div class="modal-backdrop" data-close></div>
@@ -84,7 +94,6 @@
 
   <!-- Toast -->
   <div id="toast" class="toast" hidden></div>
-
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

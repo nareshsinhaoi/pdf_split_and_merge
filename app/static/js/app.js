@@ -558,6 +558,37 @@
       if (e.key === "ArrowRight") previewNext();
     });
   }
+	// ----- Footer -----
+    const footerYear = document.getElementById("footerYear");
+    if (footerYear) footerYear.textContent = new Date().getFullYear();
 
+    const footerMergeLink = document.getElementById("footerMergeLink");
+    if (footerMergeLink) {
+      footerMergeLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        // Scroll to the toolbar and trigger merge if there are pages
+        const toolbar = document.getElementById("toolbar");
+        if (toolbar && !toolbar.hidden) {
+          toolbar.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Slight delay so the scroll starts before merge runs
+          setTimeout(() => {
+            const mergeBtn = document.getElementById("mergeBtn");
+            if (mergeBtn && !mergeBtn.disabled) mergeBtn.click();
+          }, 300);
+        } else {
+          // No pages yet — send them back to the upload area
+          const upload = document.getElementById("uploadSection");
+          if (upload) upload.scrollIntoView({ behavior: "smooth" });
+        }
+      });
+    }
+
+    // Disable placeholder links in the Legal column
+    document.querySelectorAll('.footer-col a[data-noop]').forEach(a => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (typeof toast === "function") toast("Coming soon", "");
+      });
+    });
   document.addEventListener("DOMContentLoaded", wireEvents);
 })();
