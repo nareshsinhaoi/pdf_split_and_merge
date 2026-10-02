@@ -9,3 +9,7 @@ outputs/*
 !outputs/.gitkeep
 .DS_Store
 *.log
+dist/
+dist
+build/
+build
