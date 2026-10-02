@@ -176,22 +176,16 @@ def page_preview(page_id):
 
 @page_bp.route("/pages/<page_id>/split", methods=["POST"])
 def split_page_route(page_id):
-    """
-    Split a page into two.
+    import logging, traceback
+    logger = logging.getLogger(__name__)
 
-    Body (JSON):
-      {
-        "direction": "vertical" | "horizontal",   # default "vertical"
-        "ratio": 0.5,                              # 0.05–0.95
-        "gutter": 0.0                              # optional inner margin in pts
-      }
-    """
     page = page_repo.get_page(page_id)
     if not page:
         return jsonify({"error": "Page not found"}), 404
 
     data = request.get_json(silent=True) or {}
     direction = (data.get("direction") or "vertical").lower()
+
     try:
         ratio = float(data.get("ratio", 0.5))
         gutter = float(data.get("gutter", 0.0))
@@ -204,7 +198,15 @@ def split_page_route(page_id):
         result = split_page(project_id, page_id, direction,
                             ratio=ratio, gutter=gutter)
     except SplitError as exc:
+        logger.warning("Split rejected: %s", exc)
         return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Split failed unexpectedly: %s\n%s",
+                     exc, traceback.format_exc())
+        return jsonify({
+            "error": "Split failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+        }), 500
 
     return jsonify({
         "message": "Page split successfully",

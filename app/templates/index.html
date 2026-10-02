@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <link rel="shortcut icon" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico" type="image/x-icon">
+	<link rel="apple-touch-icon" href="https://fea.assettype.com/outlook/outlook-india/assets/apple-touch-icon.png">
+	<link rel="icon" type="image/png" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico">
   <title>PDF Merger</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
@@ -17,7 +20,7 @@
     </div>
   </header>
 
-  <main class="container" style="min-height:720px;margin-bottom:0px !important">
+  <main class="container">
     <!-- Upload area -->
     <section id="uploadSection" class="card">
       <div id="dropZone" class="drop-zone" tabindex="0">
@@ -45,7 +48,8 @@
       <div class="toolbar-right">
         <button id="addMoreBtn" class="btn btn-secondary" type="button">+ Add PDF</button>
         <button id="undoDeleteBtn" class="btn btn-secondary" type="button" hidden>↩ Undo Delete</button>
-        <button id="mergeBtn" class="btn btn-primary" type="button">🔗 Merge &amp; Create PDF</button>
+        <button id="mergeBtn" class="btn btn-primary" type="button">🔗 Merge &amp; Create PDF</button> 
+        <button id="compressBtn" class="btn btn-secondary" type="button" hidden>🗜 Compress PDF</button>
       </div>
     </section>
 

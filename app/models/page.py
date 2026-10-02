@@ -78,7 +78,7 @@ def delete_pages_for_file(file_id: str) -> None:
     db = get_db()
     db.pages.delete_many({"file_id": to_object_id(file_id)})
 
-def shift_positions_from(project_id, from_position, delta=1):
+def shift_positions_from(project_id: str, from_position: int, delta: int = 1) -> None:
     """Shift all pages at or after `from_position` by `delta`."""
     db = get_db()
     db.pages.update_many(

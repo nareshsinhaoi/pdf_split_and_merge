@@ -46,6 +46,13 @@
     async getPageSize(pageId) {
       return handle(await fetch(`/api/pages/${pageId}/size`));
     },
+    async compress(id, preset = "medium") {
+      return handle(await fetch(`/api/projects/${id}/compress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preset }),
+      }));
+    },
   };
 
   async function handle(response) {
@@ -80,6 +87,7 @@
     addMoreBtn: $("#addMoreBtn"),
     newProjectBtn: $("#newProjectBtn"),
     mergeBtn: $("#mergeBtn"),
+    compressBtn: $("#compressBtn"),
     undoDeleteBtn: $("#undoDeleteBtn"),
     uploadProgress: $("#uploadProgress"),
     progressFill: $("#progressFill"),
@@ -146,6 +154,7 @@
     el.toolbar.hidden = true;
     el.pagesSection.hidden = true;
     el.projectLabel.hidden = true;
+    if (el.compressBtn) el.compressBtn.hidden = true;   // NEW
     renderPages();
   }
 
@@ -247,7 +256,7 @@
     if (state.selected.has(page._id)) card.classList.add("selected");
 
     const rot = page.rotation || 0;
-     card.innerHTML = `
+    card.innerHTML = `
       <div class="page-thumb-wrap">
         <img class="page-thumb"
              src="/api/pages/${page._id}/thumbnail"
@@ -383,6 +392,7 @@
       await refreshPages();
     }
   }
+
   /* ---------- Split page ---------- */
   async function openSplitDialog(page) {
     // Determine default direction from page aspect ratio
@@ -461,6 +471,7 @@
       loadPreviewImage(state.previewIndex);
     }
   }
+
   function previewNext() {
     if (state.previewIndex < state.pages.length - 1) {
       state.previewIndex++;
@@ -484,11 +495,57 @@
       el.downloadLink.setAttribute("download", res.output_filename);
       el.successSection.scrollIntoView({ behavior: "smooth", block: "center" });
       toast("Merged PDF ready!", "success");
+      // NEW: reveal compress button now that a merged PDF exists
+      if (el.compressBtn) el.compressBtn.hidden = false;
     } catch (e) {
       toast(e.message, "error");
     } finally {
       el.mergeBtn.disabled = false;
       el.mergeBtn.textContent = "🔗 Merge & Create PDF";
+    }
+  }
+
+  /* ---------- Compress ---------- */
+  async function compressProject() {
+    if (!state.projectId) {
+      toast("Merge a project first", "error");
+      return;
+    }
+
+    const choice = prompt(
+      "Choose compression level:\n" +
+      "  low     — light (best quality)\n" +
+      "  medium  — balanced (default)\n" +
+      "  high    — strong\n" +
+      "  extreme — maximum (lowest quality)",
+      "medium"
+    );
+    if (choice === null) return;
+
+    const preset = choice.trim().toLowerCase();
+    if (!["low", "medium", "high", "extreme"].includes(preset)) {
+      toast("Invalid preset", "error");
+      return;
+    }
+
+    el.compressBtn.disabled = true;
+    el.compressBtn.textContent = "Compressing…";
+    try {
+      const res = await API.compress(state.projectId, preset);
+      const kb = (n) => (n / 1024).toFixed(1) + " KB";
+      el.successSection.hidden = false;
+      el.successInfo.textContent =
+        `Compressed (${res.preset}): ${kb(res.input_size)} → ${kb(res.output_size)} ` +
+        `(${res.saved_pct}% saved) · ${res.output_filename}`;
+      el.downloadLink.href = res.download_url;
+      el.downloadLink.setAttribute("download", res.output_filename);
+      el.successSection.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast(`Compressed! Saved ${res.saved_pct}%`, "success");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      el.compressBtn.disabled = false;
+      el.compressBtn.textContent = "🗜 Compress PDF";
     }
   }
 
@@ -516,12 +573,14 @@
         el.dropZone.classList.add("dragover");
       })
     );
+
     ["dragleave", "drop"].forEach(evt =>
       el.dropZone.addEventListener(evt, (e) => {
         e.preventDefault(); e.stopPropagation();
         el.dropZone.classList.remove("dragover");
       })
     );
+
     el.dropZone.addEventListener("drop", (e) => {
       const files = e.dataTransfer && e.dataTransfer.files;
       if (files && files.length) uploadFiles(files);
@@ -532,6 +591,7 @@
     window.addEventListener("drop", (e) => e.preventDefault());
 
     el.mergeBtn.addEventListener("click", mergeProject);
+    if (el.compressBtn) el.compressBtn.addEventListener("click", compressProject);  // NEW
     el.undoDeleteBtn.addEventListener("click", undoDelete);
     el.newProjectBtn.addEventListener("click", () => {
       if (confirm("Start a new project? Current session will be cleared from the UI.")) newProject();
@@ -557,8 +617,8 @@
       if (e.key === "ArrowLeft") previewPrev();
       if (e.key === "ArrowRight") previewNext();
     });
-  }
-	// ----- Footer -----
+
+    // ----- Footer -----
     const footerYear = document.getElementById("footerYear");
     if (footerYear) footerYear.textContent = new Date().getFullYear();
 
@@ -566,29 +626,27 @@
     if (footerMergeLink) {
       footerMergeLink.addEventListener("click", (e) => {
         e.preventDefault();
-        // Scroll to the toolbar and trigger merge if there are pages
         const toolbar = document.getElementById("toolbar");
         if (toolbar && !toolbar.hidden) {
           toolbar.scrollIntoView({ behavior: "smooth", block: "center" });
-          // Slight delay so the scroll starts before merge runs
           setTimeout(() => {
             const mergeBtn = document.getElementById("mergeBtn");
             if (mergeBtn && !mergeBtn.disabled) mergeBtn.click();
           }, 300);
         } else {
-          // No pages yet — send them back to the upload area
           const upload = document.getElementById("uploadSection");
           if (upload) upload.scrollIntoView({ behavior: "smooth" });
         }
       });
     }
 
-    // Disable placeholder links in the Legal column
     document.querySelectorAll('.footer-col a[data-noop]').forEach(a => {
       a.addEventListener("click", (e) => {
         e.preventDefault();
-        if (typeof toast === "function") toast("Coming soon", "");
+        toast("Coming soon", "");
       });
     });
+  }
+
   document.addEventListener("DOMContentLoaded", wireEvents);
 })();
