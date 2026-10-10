@@ -18,28 +18,39 @@ def create_app(config_class=Config):
     )
     app.config.from_object(config_class)
 
+    # Ensure runtime folders exist
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["OUTPUT_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["IMAGES_FOLDER"]).mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    # Register blueprints
     from app.routes.project_routes import project_bp
     from app.routes.upload_routes import upload_bp
     from app.routes.page_routes import page_bp
     from app.routes.merge_routes import merge_bp
+    from app.routes.compress_image_routes import image_bp
 
     app.register_blueprint(project_bp)
     app.register_blueprint(upload_bp)
     app.register_blueprint(page_bp)
     app.register_blueprint(merge_bp)
+    app.register_blueprint(image_bp)
 
+    # Pages
     @app.route("/")
     def index():
         return render_template("index.html")
 
+    @app.route("/compress")
+    def compress_page():
+        return render_template("compress.html")
+
+    # Error handlers
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "Not found"}), 404

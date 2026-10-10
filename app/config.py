@@ -58,3 +58,4 @@ class Config:
     # Where Flask should look for templates/static when frozen
     TEMPLATE_FOLDER = str(APP_ROOT / "app" / "templates")
     STATIC_FOLDER = str(APP_ROOT / "app" / "static")
+    IMAGES_FOLDER = str(WRITABLE_ROOT / os.environ.get("IMAGES_FOLDER", "images"))

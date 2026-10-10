@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <link rel="shortcut icon" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico" type="image/x-icon">
+	<link rel="apple-touch-icon" href="https://fea.assettype.com/outlook/outlook-india/assets/apple-touch-icon.png">
+	<link rel="icon" type="image/png" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico">
+  <title>Compress Image · PDF Merger</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/compress.css') }}" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="container header-inner" style="min-height:50px;">
+      <h1 class="logo">📄 Image Compression Toolkit</h1>
+      <nav class="app-nav">
+        <a class="nav-link" href="/">Merge PDF</a>
+        <a class="nav-link active" href="/compress">Compress Image</a>
+      </nav>
+      <div class="header-actions">
+        <button id="newProjectBtn" class="btn btn-secondary" type="button">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container compress-main">
+    <section class="compress-hero">
+      <h1 class="compress-title">Compress image</h1>
+      <p class="compress-subtitle">
+        Reduce the file size of your images with online image compression.
+        Compress image files quickly without installing software.
+      </p>
+    </section>
+
+    <!-- STEP 1: Upload -->
+    <section id="stepUpload" class="compress-grid">
+      <div class="compress-left">
+        <div id="imgDropZone" class="img-drop-zone" tabindex="0">
+          <div class="drop-icon">⬆️</div>
+          <button id="pickFileBtn" class="btn btn-primary btn-lg" type="button">
+            Upload your file
+          </button>
+          <p class="drop-sub">or drop, paste, or select from cloud</p>
+          <input id="imgFileInput" type="file"
+                 accept="image/*,.jpg,.jpeg,.png,.webp,.bmp,.tiff" hidden />
+          <p class="drop-hint">JPG, PNG, WEBP, BMP, TIFF · Max 25 MB</p>
+        </div>
+
+        <div id="uploadedFile" class="uploaded-file" hidden>
+          <div class="uploaded-file-head">
+            <span class="uploaded-file-label">1 FILE</span>
+            <button id="clearFileBtn" class="link-btn" type="button">Clear all</button>
+          </div>
+          <div class="uploaded-file-row">
+            <img id="uploadedThumb" class="uploaded-thumb" alt="" />
+            <div class="uploaded-file-info">
+              <div id="uploadedName" class="uploaded-name">—</div>
+              <div class="uploaded-meta">
+                <span id="uploadedSize">—</span>
+                <span class="dot">·</span>
+                <span id="uploadedPct" class="pct">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compress-badges">
+          <span class="badge-check">✓ 100% Free</span>
+          <span class="badge-check">✓ No installation required</span>
+          <span class="badge-check">✓ Secure &amp; private</span>
+        </div>
+      </div>
+
+      <div class="compress-right">
+        <button id="compressNowBtn" class="btn btn-primary btn-block btn-lg" type="button" disabled>
+          → Compress Now
+        </button>
+
+        <div class="settings-card">
+          <div class="settings-tabs">
+            <button class="settings-tab active" type="button">COMPRESSION LEVEL</button>
+            <!-- <button class="settings-tab" type="button" disabled>Optional Settings</button> -->
+          </div>
+
+          <div class="settings-group">
+            <!-- <div class="settings-label">COMPRESSION LEVEL</div> -->
+
+            <label class="option-row" data-mode="less">
+              <input type="radio" name="mode" value="less" />
+              <div class="option-body">
+                <div class="option-title">Less compression</div>
+                <div class="option-desc">High quality, less compression</div>
+              </div>
+            </label>
+
+            <label class="option-row recommended" data-mode="recommended">
+              <input type="radio" name="mode" value="recommended" checked />
+              <div class="option-body">
+                <div class="option-title">Recommended compression</div>
+                <div class="option-desc">Good quality, good compression</div>
+              </div>
+              <span class="pill">RECOMMENDED</span>
+            </label>
+
+            <label class="option-row" data-mode="extreme">
+              <input type="radio" name="mode" value="extreme" />
+              <div class="option-body">
+                <div class="option-title">Extreme compression</div>
+                <div class="option-desc">Less quality, high compression</div>
+              </div>
+              <span class="pill pill-dark">BEST COMPRESSION</span>
+            </label>
+
+            <label class="option-row" data-mode="lossless">
+              <input type="radio" name="mode" value="lossless" />
+              <div class="option-body">
+                <div class="option-title">Lossless compression</div>
+                <div class="option-desc">No quality loss, modest savings</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">TARGET FILE SIZE</div>
+
+            <label class="option-row" data-mode="target_size">
+              <input type="radio" name="mode" value="target_size" />
+              <div class="option-body">
+                <div class="option-title">Target file size</div>
+                <div class="option-desc">
+                  <input id="targetKb" class="range" type="range"
+                         min="100" max="1000" step="50" value="500" disabled />
+                  <span id="targetKbValue" class="range-val">500 KB</span>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">QUALITY</div>
+
+            <label class="option-row" data-mode="quality">
+              <input type="radio" name="mode" value="quality" />
+              <div class="option-body">
+                <div class="option-title">Custom quality</div>
+                <div class="option-desc">
+                  Set the quality of the output image. Higher quality increases
+                  file size; lower quality reduces it.
+                </div>
+                <div class="range-wrap">
+                  <input id="customQuality" class="range" type="range"
+                         min="0" max="100" step="20" value="80" disabled />
+                  <span id="customQualityValue" class="range-val">80%</span>
+                </div>
+                <div class="range-ticks">
+                  <span>0%</span><span>20%</span><span>40%</span>
+                  <span>60%</span><span>80%</span><span>100%</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: Result -->
+    <section id="stepResult" class="card result-card" hidden>
+      <h2>✅ Image compressed!</h2>
+      <div class="result-stats">
+        <div class="result-stat">
+          <div class="stat-label">Before</div>
+          <div id="resultBefore" class="stat-value">—</div>
+        </div>
+        <div class="result-arrow">→</div>
+        <div class="result-stat">
+          <div class="stat-label">After</div>
+          <div id="resultAfter" class="stat-value">—</div>
+        </div>
+        <div class="result-stat highlight">
+          <div class="stat-label">Saved</div>
+          <div id="resultSaved" class="stat-value">—</div>
+        </div>
+      </div>
+      <div id="resultMode" class="muted"></div>
+      <a id="downloadBtn" class="btn btn-primary btn-lg" href="#" download>
+        ⬇ Download Compressed Image
+      </a>
+      <button id="compressAnotherBtn" class="btn btn-secondary btn-lg" type="button">
+        Compress another image
+      </button>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-bottom">
+      <div class="container footer-bottom-inner">
+        <span>&copy; <span id="footerYear"></span> PDF & Image Toolkit. All rights reserved.</span>
+        <span class="footer-version">@nareshsinha / v1.5.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="{{ url_for('static', filename='js/compress.js') }}"></script>
+</body>
+</html>
