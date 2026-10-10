@@ -29,6 +29,7 @@ def upload_files(project_id):
 
     created_files = []
     created_pages = []
+    skipped_pages = []  # list of {"file": name, "page": N}
 
     for fs in uploaded:
         if not fs or not fs.filename:
@@ -51,6 +52,19 @@ def upload_files(project_id):
             file_service.delete_stored_file(path)
             return jsonify({"error": f"Corrupted PDF: {exc}"}), 400
 
+        # --- Detect junk pages once per uploaded PDF ---
+        try:
+            junk_pages = set(file_service.detect_junk_pages(path))
+        except Exception:
+            logger.exception("Junk page detection failed for %s", stored_name)
+            junk_pages = set()
+
+        if junk_pages:
+            logger.info(
+                "Detected %d junk page(s) in %s: %s",
+                len(junk_pages), stored_name, sorted(junk_pages),
+            )
+
         size = file_service.file_size_bytes(path)
         fdoc = file_repo.create_file(
             project_id=project_id,
@@ -62,20 +76,31 @@ def upload_files(project_id):
         )
 
         start_pos = page_repo.next_position(project_id)
+        added = 0
         for i in range(page_count):
+            page_no = i + 1
+            if page_no in junk_pages:
+                skipped_pages.append({
+                    "file": fs.filename,
+                    "page": page_no,
+                })
+                continue
             pdoc = page_repo.create_page(
                 project_id=project_id,
                 file_id=str(fdoc["_id"]),
-                original_page_number=i + 1,
-                position=start_pos + i,
+                original_page_number=page_no,
+                position=start_pos + added,
             )
             created_pages.append(pdoc)
+            added += 1
 
         created_files.append(fdoc)
 
     return jsonify({
         "files": serialize_doc(created_files),
         "pages": serialize_doc(created_pages),
+        "skipped_pages": skipped_pages,
+        "skipped_count": len(skipped_pages),
     }), 201
 
 

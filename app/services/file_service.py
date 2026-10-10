@@ -1,4 +1,5 @@
 """File upload, validation and storage helpers."""
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -6,6 +7,8 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from app.config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class FileValidationError(Exception):
@@ -75,3 +78,60 @@ def delete_stored_file(file_path: str) -> None:
 
 def file_size_bytes(path: str) -> int:
     return os.path.getsize(path)
+
+
+# ---------------------------------------------------------------------------
+# Page-level quality checks
+# ---------------------------------------------------------------------------
+
+def detect_junk_pages(pdf_path: str,
+                      ink_threshold: float = 0.008,
+                      dpi: int = 36) -> list:
+    """
+    Return a list of page numbers (1-based) that look blank/junk.
+
+    Uses a low-DPI grayscale render and counts non-white pixels. A page
+    with less than `ink_threshold` fraction of ink is considered junk —
+    this catches page numbers, "CMYK" markers, and OCR digit noise, which
+    are common in scanned magazines.
+    """
+    import pymupdf
+
+    junk = []
+    try:
+        doc = pymupdf.open(pdf_path)
+    except Exception as exc:
+        logger.warning("Cannot open PDF for junk detection: %s (%s)",
+                       pdf_path, exc)
+        return junk
+
+    try:
+        for i in range(doc.page_count):
+            try:
+                page = doc.load_page(i)
+                pix = page.get_pixmap(dpi=dpi, alpha=False,
+                                      colorspace=pymupdf.csGRAY)
+            except Exception as exc:
+                logger.warning("Skipping page %d in junk scan: %s", i + 1, exc)
+                continue
+
+            samples = pix.samples
+            total = len(samples)
+            if total == 0:
+                junk.append(i + 1)
+                continue
+
+            ink = 0
+            cutoff = total * ink_threshold
+            for v in samples:
+                if v < 200:
+                    ink += 1
+                    if ink > cutoff:
+                        break
+
+            if ink <= cutoff:
+                junk.append(i + 1)
+    finally:
+        doc.close()
+
+    return junk

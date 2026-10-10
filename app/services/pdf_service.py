@@ -1,14 +1,26 @@
 """PDF processing utilities based on PyMuPDF (pymupdf)."""
+import logging
 from pathlib import Path
 
 import pymupdf  # modern import; fitz is deprecated
 
 from app.config import Config
 
+logger = logging.getLogger(__name__)
+
 
 class PDFProcessingError(Exception):
     """Raised when PDF operations fail."""
 
+
+# ---------------------------------------------------------------------------
+# Target canvas for merged output: A4 portrait, in PDF points
+# ---------------------------------------------------------------------------
+A4_WIDTH_PT = 595.276
+A4_HEIGHT_PT = 841.89
+TARGET_PORTRAIT = pymupdf.Rect(0, 0, A4_WIDTH_PT, A4_HEIGHT_PT)
+A4_PORTRAIT  = pymupdf.Rect(0, 0, 595.276, 841.89)   # 210 × 297 mm
+A4_LANDSCAPE = pymupdf.Rect(0, 0, 841.89, 595.276)   # 297 × 210 mm
 
 # ---------------------------------------------------------------------------
 # Core helpers
@@ -48,9 +60,9 @@ def _get_mediabox(page: pymupdf.Page) -> pymupdf.Rect:
     """
     Return the page's MediaBox in a normalized form.
 
-    NOTE: We use `mediabox`, NOT `rect`. `rect` returns the *CropBox*
-    intersected with the rotation, which is exactly what we do NOT want
-    when computing a crop to apply.
+    We use `mediabox`, NOT `rect`. `rect` returns the CropBox (intersected
+    with rotation), which for magazine PDFs is often much smaller than the
+    visible printed page, causing content to shrink inside the merge.
     """
     return _normalize_rect(page.mediabox)
 
@@ -95,15 +107,8 @@ def _apply_crop(page: pymupdf.Page, crop: dict | None, context: str = "") -> Non
     """
     Apply a crop rectangle to `page`.
 
-    IMPORTANT RULES (do not violate these):
-      * We only ever call `set_cropbox`, never `set_mediabox`.
-        Changing the MediaBox corrupts PDFs and causes the
-        'CropBox not in MediaBox' error to appear later after insert_pdf.
-      * The requested rect is clamped strictly *inside* the MediaBox with
-        a small epsilon, because PyMuPDF rejects a CropBox that equals the
-        MediaBox boundary on some builds and rejects any overshoot at all.
-      * If the requested rect does not meaningfully intersect the MediaBox,
-        we skip it silently (with a warning) rather than crashing the merge.
+    We only ever call `set_cropbox`, never `set_mediabox`, because changing
+    the MediaBox corrupts PDFs and causes downstream CropBox errors.
     """
     if not crop:
         return
@@ -116,12 +121,10 @@ def _apply_crop(page: pymupdf.Page, crop: dict | None, context: str = "") -> Non
     if requested is None:
         return
 
-    # Intersect with MediaBox first, so we never pass an out-of-bounds rect
     clamped = requested & mb
 
-    # Shrink inward by epsilon. PyMuPDF validates `CropBox in MediaBox`
-    # with strict inequality on some builds (or with float error), so a
-    # CropBox that touches the MediaBox border can still fail.
+    # Shrink inward by epsilon; PyMuPDF rejects a CropBox that touches
+    # the MediaBox boundary on some builds due to float error.
     EPS = 0.5
     cx0 = max(mb.x0 + EPS, clamped.x0)
     cy0 = max(mb.y0 + EPS, clamped.y0)
@@ -129,21 +132,17 @@ def _apply_crop(page: pymupdf.Page, crop: dict | None, context: str = "") -> Non
     cy1 = min(mb.y1 - EPS, clamped.y1)
 
     if cx1 - cx0 < 1 or cy1 - cy0 < 1:
-        import logging
-        logging.getLogger(__name__).warning(
-            "Crop skipped (too small after clamp). %s "
-            "requested=%s mediabox=%s",
+        logger.warning(
+            "Crop skipped (too small after clamp). %s requested=%s mediabox=%s",
             context, _rect_tuple(requested), _rect_tuple(mb),
         )
         return
 
     safe = pymupdf.Rect(cx0, cy0, cx1, cy1)
 
-    # Sanity check: safe MUST be strictly inside mb
     if not (safe.x0 >= mb.x0 and safe.y0 >= mb.y0
             and safe.x1 <= mb.x1 and safe.y1 <= mb.y1):
-        import logging
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Crop skipped (would not be inside MediaBox). %s "
             "safe=%s mediabox=%s",
             context, _rect_tuple(safe), _rect_tuple(mb),
@@ -153,13 +152,49 @@ def _apply_crop(page: pymupdf.Page, crop: dict | None, context: str = "") -> Non
     try:
         page.set_cropbox(safe)
     except ValueError as exc:
-        # Last resort: give up on this crop but don't kill the whole merge
-        import logging
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "set_cropbox failed for %s: %s. requested=%s safe=%s mediabox=%s",
             context, exc, _rect_tuple(requested), _rect_tuple(safe),
             _rect_tuple(mb),
         )
+
+
+# ---------------------------------------------------------------------------
+# Blank / junk page detection
+# ---------------------------------------------------------------------------
+
+def is_blank_or_junk_page(doc: pymupdf.Document,
+                          page_index: int,
+                          dpi: int = 36,
+                          ink_threshold: float = 0.008) -> bool:
+    """
+    Return True if the page is essentially blank or contains only a tiny
+    amount of ink (a page number, a stray 'CMYK', repeating digit noise).
+
+    `ink_threshold` is the fraction of non-white pixels below which we
+    classify the page as junk. Default 0.008 = 0.8%.
+    """
+    try:
+        page = doc.load_page(page_index)
+        pix = page.get_pixmap(dpi=dpi, alpha=False, colorspace=pymupdf.csGRAY)
+    except Exception:
+        return False
+
+    samples = pix.samples
+    total = len(samples)
+    if total == 0:
+        return True
+
+    # Count pixels darker than 200 (out of 255). Anything below is "ink".
+    ink = 0
+    for v in samples:
+        if v < 200:
+            ink += 1
+            # Early exit once we're clearly above threshold
+            if ink > total * ink_threshold:
+                return False
+
+    return (ink / total) < ink_threshold
 
 
 # ---------------------------------------------------------------------------
@@ -201,10 +236,123 @@ def get_page_size(path: str, page_number: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Merge
+# Merge  (cover: fill the entire A4 canvas, no white margins)
 # ---------------------------------------------------------------------------
+def _detect_content_bbox(page: pymupdf.Page, dpi: int = 48,
+                         white_cutoff: int = 240) -> pymupdf.Rect:
+    """
+    Render the page at low DPI, find the bbox of non-white pixels,
+    convert back to PDF points. Returns the mediabox if nothing found.
+    """
+    pix = page.get_pixmap(dpi=dpi, alpha=False, colorspace=pymupdf.csGRAY)
+    w, h = pix.width, pix.height
+    s = pix.samples
+    stride = pix.stride
+
+    min_x, min_y, max_x, max_y = w, h, -1, -1
+    for y in range(h):
+        off = y * stride
+        row = s[off:off + w]
+        first = -1
+        last = -1
+        for x in range(w):
+            if row[x] < white_cutoff:
+                first = x
+                break
+        if first == -1:
+            continue
+        for x in range(w - 1, -1, -1):
+            if row[x] < white_cutoff:
+                last = x
+                break
+        if y < min_y:
+            min_y = y
+        if y > max_y:
+            max_y = y
+        if first < min_x:
+            min_x = first
+        if last > max_x:
+            max_x = last
+
+    mb = page.mediabox
+    if max_x < 0 or max_y < 0:
+        return _normalize_rect(mb)
+
+    sx = mb.width / w
+    sy = mb.height / h
+    return _normalize_rect(pymupdf.Rect(
+        mb.x0 + min_x * sx,
+        mb.y0 + min_y * sy,
+        mb.x0 + (max_x + 1) * sx,
+        mb.y0 + (max_y + 1) * sy,
+    ))
+
+def _build_normalized_page(src: pymupdf.Document,
+                           idx: int,
+                           crop: dict | None,
+                           user_rotation: int,
+                           context: str = "") -> pymupdf.Document:
+    """
+    Render one source page onto a canvas that matches the *content's*
+    orientation (not the page box's orientation).
+
+    This handles the common magazine case where the physical page is A4
+    portrait but the printed content inside is a landscape spread rotated
+    90° to sit on the page.
+    """
+    src_page = src.load_page(idx)
+
+    if crop:
+        _apply_crop(src_page, crop, context=context + " [source]")
+
+    # --- Decide orientation from the RENDERED CONTENT, not the mediabox ---
+    content_box = _detect_content_bbox(src_page)
+    # Fall back to mediabox if detection failed
+    if content_box.is_empty or content_box.width < 10 or content_box.height < 10:
+        content_box = _normalize_rect(src_page.mediabox)
+
+    cw, ch = content_box.width, content_box.height
+    is_landscape = cw > ch
+    canvas = A4_LANDSCAPE if is_landscape else A4_PORTRAIT
+
+    # Apply user rotation on top of content orientation
+    total_rotation = user_rotation % 360
+    if total_rotation in (90, 270):
+        disp_w, disp_h = ch, cw
+        # user rotated it - swap canvas accordingly
+        canvas = A4_PORTRAIT if is_landscape else A4_LANDSCAPE
+    else:
+        disp_w, disp_h = cw, ch
+
+    # COVER: fill the canvas, crop overflow
+    scale = max(canvas.width / disp_w, canvas.height / disp_h)
+    placed_w = disp_w * scale
+    placed_h = disp_h * scale
+    tx = (canvas.width - placed_w) / 2.0
+    ty = (canvas.height - placed_h) / 2.0
+    target_rect = pymupdf.Rect(tx, ty, tx + placed_w, ty + placed_h)
+
+    # Set CropBox on the source so show_pdf_page renders only the content
+    # (not the scanner's white border).
+    try:
+        src_page.set_cropbox(content_box)
+    except Exception as exc:
+        logger.warning("Could not set CropBox on %s: %s", context, exc)
+
+    temp = pymupdf.open()
+    out_page = temp.new_page(width=canvas.width, height=canvas.height)
+    out_page.show_pdf_page(target_rect, src, idx, rotate=total_rotation)
+    return temp
+
 
 def merge_pages(page_specs: list, output_path: str) -> str:
+    """
+    Merge page specs into a single PDF where every page is A4 portrait
+    and content fills the canvas (cover).
+
+    If a spec has `skip_if_junk=True`, the corresponding source page is
+    checked for blank/junk content and skipped if it looks empty.
+    """
     if not page_specs:
         raise PDFProcessingError("No pages to merge")
 
@@ -212,6 +360,8 @@ def merge_pages(page_specs: list, output_path: str) -> str:
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     out_doc = pymupdf.open()
+    pages_written = 0
+    pages_skipped = 0
     try:
         for i, spec in enumerate(page_specs):
             src = pymupdf.open(spec["file_path"])
@@ -222,6 +372,15 @@ def merge_pages(page_specs: list, output_path: str) -> str:
                         f"Page {spec['original_page_number']} not found in "
                         f"{spec['file_path']}"
                     )
+
+                # Optional junk filter at merge time
+                if spec.get("skip_if_junk") and is_blank_or_junk_page(src, idx):
+                    logger.info(
+                        "Skipping junk page %s (file=%s idx=%d)",
+                        spec.get("page_id", "?"), spec["file_path"], idx,
+                    )
+                    pages_skipped += 1
+                    continue
 
                 rotation = spec.get("rotation", 0) % 360
                 crop = spec.get("crop")
@@ -235,32 +394,30 @@ def merge_pages(page_specs: list, output_path: str) -> str:
                     f"crop={crop}"
                 )
 
-                # ---------------------------------------------------------
-                # KEY FIX: apply crop to the SOURCE page (unrotated space)
-                # BEFORE insert_pdf, so that when insert_pdf(rotate=N)
-                # rotates the page, the crop rotates with it.
-                #
-                # We also must NOT call set_mediabox() — that breaks
-                # downstream CropBox validation. Only set_cropbox().
-                # ---------------------------------------------------------
-                if crop:
-                    src_page = src.load_page(idx)
-                    _apply_crop(src_page, crop, context=ctx + " [source]")
-
-                # Insert the (now-cropped) source page with rotation applied
-                out_doc.insert_pdf(
-                    src,
-                    from_page=idx,
-                    to_page=idx,
-                    rotate=rotation,
+                normalized = _build_normalized_page(
+                    src, idx, crop, rotation, context=ctx
                 )
+                try:
+                    out_doc.insert_pdf(normalized)
+                    pages_written += 1
+                finally:
+                    normalized.close()
             finally:
                 src.close()
+
+        if pages_written == 0:
+            raise PDFProcessingError(
+                "No valid pages to merge (all were skipped as junk)."
+            )
 
         out_doc.save(output_path, garbage=3, deflate=True)
     finally:
         out_doc.close()
 
+    logger.info(
+        "Merged %d page(s), skipped %d junk page(s) -> %s",
+        pages_written, pages_skipped, output_path,
+    )
     return output_path
 
 
