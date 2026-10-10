@@ -209,7 +209,12 @@
 
       await refreshPages();
       el.successSection.hidden = true;
-      toast(`${pdfs.length} file(s) uploaded`, "success");
+      //toast(`${pdfs.length} file(s) uploaded`, "success");
+      if (data && data.skipped_count) {
+        toast(`${pdfs.length} file(s) uploaded · ${data.skipped_count} blank page(s) skipped`, "success" );
+      } else {
+        toast(`${pdfs.length} file(s) uploaded`, "success");
+      }
       void data;
     } catch (e) {
       el.uploadProgress.hidden = true;
