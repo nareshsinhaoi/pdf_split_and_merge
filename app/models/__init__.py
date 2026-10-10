@@ -30,6 +30,8 @@ def _ensure_indexes(db):
     db.files.create_index("project_id")
     db.pages.create_index([("project_id", 1), ("position", 1)])
     db.pages.create_index("file_id")
+    db.image_jobs.create_index("uploaded_at")
+    db.image_jobs.create_index("status")
 
 
 def to_object_id(value):

@@ -354,3 +354,18 @@ main.container { min-height: 720px; margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* Header nav (shared) */
+.app-nav { display: flex; gap: 4px; margin-left: 20px; }
+.nav-link {
+  padding: 8px 14px; border-radius: 8px;
+  color: var(--muted); font-size: 14px; font-weight: 600;
+  text-decoration: none; transition: background .15s, color .15s;
+}
+.nav-link:hover { background: #eef1f7; color: var(--text); }
+.nav-link.active { background: #eef2ff; color: var(--primary); }
+@media (max-width: 640px) {
+  .header-inner { flex-wrap: wrap; }
+  .app-nav { order: 3; width: 100%; margin: 8px 0 0; justify-content: flex-start; }
+  .nav-link { padding: 8px 12px; font-size: 13px; }
+}
