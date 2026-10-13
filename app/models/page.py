@@ -3,6 +3,24 @@ from bson import ObjectId
 
 from app.models import get_db, to_object_id
 
+# def create_page(project_id, file_id, original_page_number, position,
+#                 rotation=0, crop=None, parent_page_id=None):
+#     db = get_db()
+#     doc = {
+#         "project_id": to_object_id(project_id),
+#         "file_id": to_object_id(file_id),
+#         "original_page_number": original_page_number,
+#         "position": position,
+#         "rotation": rotation,
+#         "deleted": False,
+#         "crop": crop,                     # {"x0","y0","x1","y1"} or None
+#         "parent_page_id": to_object_id(parent_page_id) if parent_page_id else None,
+#         "title": None,
+#     }
+#     result = db.pages.insert_one(doc)
+#     doc["_id"] = result.inserted_id
+#     return doc
+
 def create_page(project_id, file_id, original_page_number, position,
                 rotation=0, crop=None, parent_page_id=None):
     db = get_db()
@@ -13,8 +31,9 @@ def create_page(project_id, file_id, original_page_number, position,
         "position": position,
         "rotation": rotation,
         "deleted": False,
-        "crop": crop,                     # {"x0","y0","x1","y1"} or None
+        "crop": crop,
         "parent_page_id": to_object_id(parent_page_id) if parent_page_id else None,
+        "title": None,   # NEW: custom sidebar label
     }
     result = db.pages.insert_one(doc)
     doc["_id"] = result.inserted_id

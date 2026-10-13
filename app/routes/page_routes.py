@@ -45,9 +45,48 @@ def list_pages(project_id):
     return jsonify(serialize_doc(result)), 200
 
 
+# @page_bp.route("/pages/<page_id>", methods=["PUT"])
+# def update_page(page_id):
+#     """Update rotation or deleted flag."""
+#     data = request.get_json(silent=True) or {}
+#     update = {}
+
+#     if "rotation" in data:
+#         try:
+#             rot = int(data["rotation"]) % 360
+#         except (TypeError, ValueError):
+#             return jsonify({"error": "rotation must be an integer"}), 400
+#         if rot not in (0, 90, 180, 270):
+#             return jsonify({"error": "rotation must be 0, 90, 180 or 270"}), 400
+#         update["rotation"] = rot
+
+#     if "deleted" in data:
+#         update["deleted"] = bool(data["deleted"])
+
+#     # NEW: custom display title for the sidebar
+#     if "title" in data:
+#         title = data["title"]
+#         if title is None:
+#             update["title"] = None
+#         elif isinstance(title, str):
+#             update["title"] = title.strip()[:200]
+#         else:
+#             return jsonify({"error": "title must be a string"}), 400
+
+#     if not update:
+#         return jsonify({"error": "No valid fields provided"}), 400
+
+#     page = page_repo.get_page(page_id)
+#     if not page:
+#         return jsonify({"error": "Page not found"}), 404
+
+#     page_repo.update_page(page_id, update)
+#     updated = page_repo.get_page(page_id)
+#     return jsonify(serialize_doc(updated)), 200
+
 @page_bp.route("/pages/<page_id>", methods=["PUT"])
 def update_page(page_id):
-    """Update rotation or deleted flag."""
+    """Update rotation, deleted flag, or custom title."""
     data = request.get_json(silent=True) or {}
     update = {}
 
@@ -63,6 +102,16 @@ def update_page(page_id):
     if "deleted" in data:
         update["deleted"] = bool(data["deleted"])
 
+    # NEW: custom display title for the sidebar
+    if "title" in data:
+        title = data["title"]
+        if title is None:
+            update["title"] = None
+        elif isinstance(title, str):
+            update["title"] = title.strip()[:200]
+        else:
+            return jsonify({"error": "title must be a string"}), 400
+
     if not update:
         return jsonify({"error": "No valid fields provided"}), 400
 
@@ -73,7 +122,6 @@ def update_page(page_id):
     page_repo.update_page(page_id, update)
     updated = page_repo.get_page(page_id)
     return jsonify(serialize_doc(updated)), 200
-
 
 @page_bp.route("/pages/<page_id>", methods=["DELETE"])
 def delete_page(page_id):
