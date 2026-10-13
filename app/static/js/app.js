@@ -2,6 +2,16 @@
 (() => {
   "use strict";
 
+  /* ---------- Sidebar bridge ----------
+     The sidebar module (sidebar.js) listens for these events so it can
+     re-render its list whenever the grid changes (upload, delete,
+     split, duplicate, reorder, undo). */
+  function syncSidebar(pages) {
+    if (window.PageSidebar && typeof window.PageSidebar.setPages === "function") {
+      window.PageSidebar.setPages(pages);
+    }
+  }
+
   const API = {
     async createProject(name) {
       const r = await fetch("/api/projects", {
@@ -142,6 +152,9 @@
     state.projectId = project._id;
     el.projectLabel.hidden = false;
     el.projectLabel.textContent = `Project: ${project.project_name}`;
+    if (window.PageSidebar && window.PageSidebar.setProject) {
+      window.PageSidebar.setProject(state.projectId);
+    }
     return state.projectId;
   }
 
@@ -154,7 +167,10 @@
     el.toolbar.hidden = true;
     el.pagesSection.hidden = true;
     el.projectLabel.hidden = true;
-    if (el.compressBtn) el.compressBtn.hidden = true;   // NEW
+    if (el.compressBtn) el.compressBtn.hidden = true;
+    if (window.PageSidebar && window.PageSidebar.clear) {
+      window.PageSidebar.clear();
+    }
     renderPages();
   }
 
@@ -209,13 +225,11 @@
 
       await refreshPages();
       el.successSection.hidden = true;
-      //toast(`${pdfs.length} file(s) uploaded`, "success");
       if (data && data.skipped_count) {
-        toast(`${pdfs.length} file(s) uploaded · ${data.skipped_count} blank page(s) skipped`, "success" );
+        toast(`${pdfs.length} file(s) uploaded · ${data.skipped_count} blank page(s) skipped`, "success");
       } else {
         toast(`${pdfs.length} file(s) uploaded`, "success");
       }
-      void data;
     } catch (e) {
       el.uploadProgress.hidden = true;
       toast(e.message, "error");
@@ -237,6 +251,7 @@
     if (!pages.length) {
       el.toolbar.hidden = true;
       el.pagesSection.hidden = true;
+      syncSidebar([]);
       return;
     }
     el.toolbar.hidden = false;
@@ -249,6 +264,7 @@
     el.pageCountLabel.textContent = `${pages.length} page${pages.length === 1 ? "" : "s"}`;
     updateSelectedCount();
     el.undoDeleteBtn.hidden = state.deletedPages.length === 0;
+    syncSidebar(pages);
   }
 
   function buildPageCard(page, index) {
@@ -400,14 +416,11 @@
 
   /* ---------- Split page ---------- */
   async function openSplitDialog(page) {
-    // Determine default direction from page aspect ratio
     let size;
     try { size = await API.getPageSize(page._id); }
     catch (e) { toast(e.message, "error"); return; }
 
     const isLandscape = size.width >= size.height;
-    // Landscape spread → vertical split (left/right)
-    // Portrait tall page → horizontal split (top/bottom)
     const defaultDir = isLandscape ? "vertical" : "horizontal";
 
     const dir = prompt(
@@ -500,7 +513,6 @@
       el.downloadLink.setAttribute("download", res.output_filename);
       el.successSection.scrollIntoView({ behavior: "smooth", block: "center" });
       toast("Merged PDF ready!", "success");
-      // NEW: reveal compress button now that a merged PDF exists
       if (el.compressBtn) el.compressBtn.hidden = false;
     } catch (e) {
       toast(e.message, "error");
@@ -556,7 +568,6 @@
 
   /* ---------- Event wiring ---------- */
   function wireEvents() {
-    // Open file dialog
     el.selectFilesBtn.addEventListener("click", (e) => { e.stopPropagation(); el.fileInput.click(); });
     el.addMoreBtn.addEventListener("click", () => el.fileInput.click());
     el.dropZone.addEventListener("click", () => el.fileInput.click());
@@ -571,7 +582,6 @@
       }
     });
 
-    // Drag & drop on the drop zone
     ["dragenter", "dragover"].forEach(evt =>
       el.dropZone.addEventListener(evt, (e) => {
         e.preventDefault(); e.stopPropagation();
@@ -591,12 +601,11 @@
       if (files && files.length) uploadFiles(files);
     });
 
-    // Prevent browser from opening dropped files elsewhere
     window.addEventListener("dragover", (e) => e.preventDefault());
     window.addEventListener("drop", (e) => e.preventDefault());
 
     el.mergeBtn.addEventListener("click", mergeProject);
-    if (el.compressBtn) el.compressBtn.addEventListener("click", compressProject);  // NEW
+    if (el.compressBtn) el.compressBtn.addEventListener("click", compressProject);
     el.undoDeleteBtn.addEventListener("click", undoDelete);
     el.newProjectBtn.addEventListener("click", () => {
       if (confirm("Start a new project? Current session will be cleared from the UI.")) newProject();
@@ -623,34 +632,18 @@
       if (e.key === "ArrowRight") previewNext();
     });
 
-    // ----- Footer -----
+    // When the sidebar reorders, reload the grid.
+    document.addEventListener("pages:refresh", async () => {
+      if (state.projectId) {
+        const pages = await API.listPages(state.projectId);
+        state.pages = pages;
+        renderPages();
+      }
+    });
+
+    // Footer year
     const footerYear = document.getElementById("footerYear");
     if (footerYear) footerYear.textContent = new Date().getFullYear();
-
-    const footerMergeLink = document.getElementById("footerMergeLink");
-    if (footerMergeLink) {
-      footerMergeLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        const toolbar = document.getElementById("toolbar");
-        if (toolbar && !toolbar.hidden) {
-          toolbar.scrollIntoView({ behavior: "smooth", block: "center" });
-          setTimeout(() => {
-            const mergeBtn = document.getElementById("mergeBtn");
-            if (mergeBtn && !mergeBtn.disabled) mergeBtn.click();
-          }, 300);
-        } else {
-          const upload = document.getElementById("uploadSection");
-          if (upload) upload.scrollIntoView({ behavior: "smooth" });
-        }
-      });
-    }
-
-    document.querySelectorAll('.footer-col a[data-noop]').forEach(a => {
-      a.addEventListener("click", (e) => {
-        e.preventDefault();
-        toast("Coming soon", "");
-      });
-    });
   }
 
   document.addEventListener("DOMContentLoaded", wireEvents);

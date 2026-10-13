@@ -24,7 +24,7 @@ html, body {
   -webkit-text-size-adjust: 100%;
 }
 img { max-width: 100%; height: auto; }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
 
 /* Main content min-height (desktop only) */
 main.container { min-height: 720px; margin-bottom: 0; }
@@ -38,6 +38,16 @@ main.container { min-height: 720px; margin-bottom: 0; }
 .logo { font-size: 20px; margin: 0; white-space: nowrap; }
 .header-actions { display: flex; gap: 10px; align-items: center; min-width: 0; }
 .project-label { color: var(--muted); font-size: 13px; }
+
+/* Header nav (shared) */
+.app-nav { display: flex; gap: 4px; margin-left: 20px; }
+.nav-link {
+  padding: 8px 14px; border-radius: 8px;
+  color: var(--muted); font-size: 14px; font-weight: 600;
+  text-decoration: none; transition: background .15s, color .15s;
+}
+.nav-link:hover { background: #eef1f7; color: var(--text); }
+.nav-link.active { background: #eef2ff; color: var(--primary); }
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -95,7 +105,6 @@ main.container { min-height: 720px; margin-bottom: 0; }
 /* ---------- Pages grid ---------- */
 .pages-section { margin-bottom: 40px; min-width: 0; }
 
-/* Default (desktop): exactly 5 columns */
 .pages-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -142,6 +151,18 @@ main.container { min-height: 720px; margin-bottom: 0; }
   flex-wrap: wrap;
 }
 .page-actions .btn-icon { padding: 4px 6px; font-size: 13px; flex: 1 1 auto; min-width: 0; }
+
+/* Flash animation when jumping from sidebar */
+.page-card.flash {
+  animation: flash-card 0.9s ease-out;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,70,229,.35);
+}
+@keyframes flash-card {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
 
 /* ---------- Success card ---------- */
 .success-card { text-align: center; border-color: #bbf7d0; background: #f0fdf4; }
@@ -209,20 +230,211 @@ main.container { min-height: 720px; margin-bottom: 0; }
 }
 .footer-version { color: #64748b; }
 
-/* ══════════════════════════════════════════
+/* =========================================================
+   Page shell: main + sticky right sidebar
+   ========================================================= */
+
+.page-shell {
+  display: grid;
+  /* main content + right sidebar (fixed 320px column) */
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px;
+  margin-top: 20px;
+}
+
+.main-content {
+  /* The <main> still uses .container for its own padding, but since
+     .page-shell already handles horizontal spacing, zero it out. */
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Sidebar (right column) */
+.page-sidebar {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+
+  /* STICKY: sits below the sticky header, stays in view while scrolling */
+  /* position: sticky; */
+  top: 84px;
+  /* max-height: calc(100vh - 100px); */
+  /* overflow-y: auto; */
+  align-self: start; margin-top: 20px;
+}
+
+/* Sidebar header */
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+  letter-spacing: .02em;
+}
+
+.sidebar-count {
+  background: #eef2ff;
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sidebar-empty {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Row */
+.sidebar-row {
+  display: grid;
+  grid-template-columns: 14px 22px 1fr 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #fafbfe;
+  cursor: default;
+  transition: background .12s, border-color .12s;
+}
+
+.sidebar-row:hover { background: #f2f4fa; }
+.sidebar-row.selected { border-color: var(--primary); background: #eef2ff; }
+.sidebar-row.dragging { opacity: .45; }
+.sidebar-row.drag-over-top { border-top: 2px solid var(--primary); }
+.sidebar-row.drag-over-bottom { border-bottom: 2px solid var(--primary); }
+
+.drag-handle {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  text-align: center;
+}
+.drag-handle:active { cursor: grabbing; }
+
+.drag-handle-inline {
+  display: inline-block;
+  padding: 0 2px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.sidebar-index {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+}
+
+.sidebar-title {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  min-width: 0;
+  outline: none;
+  transition: border-color .12s, background .12s;
+}
+.sidebar-title:hover { background: #ffffff; border-color: var(--border); }
+.sidebar-title:focus {
+  background: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79,70,229,.18);
+}
+
+.sidebar-go {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  line-height: 1;
+}
+.sidebar-go:hover {
+  background: #eef2ff;
+  color: var(--primary);
+  border-color: var(--border);
+}
+
+.sidebar-hint {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 10px 2px 2px;
+  line-height: 1.4;
+}
+
+/* Mobile-only toggle (hidden on desktop) */
+.sidebar-toggle {
+  display: none;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #eef1f7;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* =========================================================
    RESPONSIVE LAYER
-══════════════════════════════════════════ */
+   ========================================================= */
 
 /* Large tablets / small laptops */
 @media (max-width: 1024px) {
   .container { padding: 0 20px; }
   .pages-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .page-shell { grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; }
 }
 
 /* Tablets */
 @media (max-width: 900px) {
   .pages-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   .modal-body { width: min(760px, 96vw); }
+
+  /* Sidebar stacks UNDER the main content and collapses behind a toggle */
+  .page-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sidebar-toggle { display: inline-flex; align-items: center; gap: 6px; }
+
+  .page-sidebar {
+    position: static;
+    max-height: none;
+    display: none;
+  }
+  .page-sidebar.open { display: block; }
 }
 
 /* Landscape phones & small tablets */
@@ -237,7 +449,6 @@ main.container { min-height: 720px; margin-bottom: 0; }
   .drop-icon { font-size: 36px; }
   .drop-title { font-size: 16px; }
 
-  /* 3 columns */
   .pages-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 
   .toolbar { flex-direction: column; align-items: stretch; }
@@ -252,13 +463,12 @@ main.container { min-height: 720px; margin-bottom: 0; }
   .modal-image-wrap { padding: 10px; }
 }
 
-/* ══════════════════════════════════════════
-   PHONES: 1 PAGE-CARD PER ROW
-══════════════════════════════════════════ */
+/* Phones: 1 page-card per row */
 @media (max-width: 640px) {
   body { font-size: 14.5px; }
   .container { padding: 0 14px; }
-  .header-inner { padding: 10px 0; }
+  .page-shell { padding: 0 14px; }
+  .header-inner { padding: 10px 0; flex-wrap: wrap; }
   .logo { font-size: 17px; }
   .btn { padding: 10px 14px; font-size: 13.5px; }
   .header-actions .btn { padding: 9px 12px; font-size: 13px; }
@@ -270,15 +480,12 @@ main.container { min-height: 720px; margin-bottom: 0; }
   .drop-zone .btn-primary { width: 100%; }
   .drop-hint { font-size: 11px; }
 
-  /* ---- 1 card per row ---- */
   .pages-grid { grid-template-columns: 1fr; gap: 14px; }
 
-  /* Full-width card polish */
   .page-card { padding: 10px; border-radius: 10px; }
   .page-thumb-wrap { aspect-ratio: auto; height: 340px; }
   .page-name { font-size: 12px; margin: 8px 2px 4px; }
 
-  /* Actions: 6 buttons share the row equally, ≥40px tap targets */
   .page-actions { gap: 6px; flex-wrap: nowrap; }
   .page-actions .btn-icon {
     flex: 1 1 0;
@@ -296,17 +503,29 @@ main.container { min-height: 720px; margin-bottom: 0; }
 
   .footer-bottom-inner { flex-direction: column; text-align: center; }
   .toast { bottom: 16px; padding: 11px 16px; font-size: 13px; }
+
+  /* Sidebar responsive tweaks */
+  .page-sidebar { padding: 10px; }
+  .sidebar-row {
+    grid-template-columns: 14px 20px 1fr 24px;
+    gap: 4px;
+  }
+  .sidebar-title { font-size: 12.5px; }
+
+  /* Nav */
+  .app-nav { order: 3; width: 100%; margin: 8px 0 0; justify-content: flex-start; }
+  .nav-link { padding: 8px 12px; font-size: 13px; }
 }
 
 /* Small phones */
 @media (max-width: 480px) {
   .container { padding: 0 12px; }
+  .page-shell { padding: 0 12px; }
   .header-inner { gap: 8px; }
   .logo { font-size: 16px; }
   .header-actions { gap: 8px; }
   .header-actions .btn { padding: 8px 10px; font-size: 12.5px; }
 
-  /* Still 1 card per row, tighter spacing + shorter thumbnail */
   .pages-grid { grid-template-columns: 1fr; gap: 12px; }
   .page-thumb-wrap { height: 280px; }
   .page-index { font-size: 10px; padding: 1px 5px; }
@@ -355,17 +574,297 @@ main.container { min-height: 720px; margin-bottom: 0; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
-/* Header nav (shared) */
-.app-nav { display: flex; gap: 4px; margin-left: 20px; }
-.nav-link {
-  padding: 8px 14px; border-radius: 8px;
-  color: var(--muted); font-size: 14px; font-weight: 600;
-  text-decoration: none; transition: background .15s, color .15s;
+
+/* =========================================================
+   Sidebar — colour-coded rows, bold numbers, status pills
+   ========================================================= */
+
+/* Header count chip — gradient for polish */
+.sidebar-count {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  color: var(--primary);
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 1px 2px rgba(79, 70, 229, .12);
 }
-.nav-link:hover { background: #eef1f7; color: var(--text); }
-.nav-link.active { background: #eef2ff; color: var(--primary); }
+
+/* Each row uses CSS custom properties set by sidebar.js
+   (--row-fg, --row-bg, --row-bd) to colour its accent. */
+.sidebar-row {
+  display: grid;
+  grid-template-columns: 14px 34px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 6px;
+
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--row-fg, var(--primary));
+  border-radius: 10px;
+
+  background: linear-gradient(90deg,
+              var(--row-bg, #fafbfe) 0%,
+              #ffffff 60%);
+
+  cursor: default;
+  transition: transform .12s ease,
+              box-shadow .15s ease,
+              border-color .12s ease,
+              background .15s ease;
+
+  min-height: 52px;
+}
+
+.sidebar-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+  border-left-width: 5px;
+}
+
+.sidebar-row.selected {
+  border-color: var(--row-fg, var(--primary));
+  border-left-width: 6px;
+  background: linear-gradient(90deg,
+              var(--row-bg, #eef2ff) 0%,
+              #f5f7ff 100%);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, .18);
+}
+
+.sidebar-row.dragging {
+  opacity: .5;
+  transform: scale(0.985);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .18);
+}
+
+/* Bold, coloured number badge — the anchor of the row */
+.sidebar-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+
+  color: #ffffff;
+  background: linear-gradient(135deg,
+              var(--row-fg, var(--primary)),
+              color-mix(in srgb, var(--row-fg, var(--primary)) 75%, #000 25%));
+  box-shadow: 0 2px 4px rgba(15, 23, 42, .18),
+              inset 0 1px 0 rgba(255, 255, 255, .25);
+  user-select: none;
+}
+
+/* Row body: title input + meta line */
+.sidebar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* File chip + status pills underneath the title */
+.sidebar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: none;
+
+  color: var(--file-fg, var(--muted));
+  background: var(--file-bg, #f1f3f8);
+  border: 1px solid var(--file-bd, var(--border));
+
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pills {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 6px;
+
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .02em;
+
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.pill-split {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.pill-rot {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.pill-crop {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+/* Editable title input inside the row */
+.sidebar-title {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  padding: 3px 6px;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: inherit;
+  min-width: 0;
+  outline: none;
+
+  transition: border-color .12s, background .12s, box-shadow .12s;
+}
+
+.sidebar-title:hover {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+.sidebar-title:focus {
+  background: #ffffff;
+  border-color: var(--row-fg, var(--primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb,
+              var(--row-fg, var(--primary)) 18%, transparent);
+}
+
+/* Jump-to-grid button */
+.sidebar-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  color: var(--row-fg, var(--muted));
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+
+  transition: background .12s, color .12s, border-color .12s, transform .08s;
+}
+
+.sidebar-go:hover {
+  background: var(--row-fg, var(--primary));
+  color: #ffffff;
+  border-color: var(--row-fg, var(--primary));
+  transform: translateX(1px);
+}
+
+.sidebar-go:active { transform: translateX(2px) scale(0.96); }
+
+/* Drag handle — a bit more visible now */
+.drag-handle {
+  color: var(--row-fg, #94a3b8);
+  opacity: .55;
+  font-size: 15px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  text-align: center;
+  letter-spacing: -3px;
+}
+.sidebar-row:hover .drag-handle { opacity: 1; }
+.drag-handle:active { cursor: grabbing; }
+
+/* Drop indicators use the row colour */
+.sidebar-row.drag-over-top {
+  border-top: 3px solid var(--row-fg, var(--primary));
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+.sidebar-row.drag-over-bottom {
+  border-bottom: 3px solid var(--row-fg, var(--primary));
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+
+/* Hint text */
+.sidebar-hint {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 12px 2px 2px;
+  line-height: 1.5;
+  text-align: center;
+  opacity: .85;
+}
+
+.drag-handle-inline {
+  display: inline-block;
+  padding: 0 2px;
+  color: var(--primary);
+  font-weight: 800;
+  letter-spacing: -2px;
+}
+
+/* Mobile: tighten spacing but keep the colours */
 @media (max-width: 640px) {
-  .header-inner { flex-wrap: wrap; }
-  .app-nav { order: 3; width: 100%; margin: 8px 0 0; justify-content: flex-start; }
-  .nav-link { padding: 8px 12px; font-size: 13px; }
+  .sidebar-row {
+    grid-template-columns: 12px 30px 1fr 26px;
+    gap: 6px;
+    padding: 7px 6px;
+    min-height: 48px;
+  }
+  .sidebar-number {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+    border-radius: 7px;
+  }
+  .sidebar-title { font-size: 12.5px; padding: 2px 5px; }
+  .file-chip { font-size: 10px; padding: 1px 7px; }
+  .status-pill { font-size: 9.5px; padding: 1px 5px; }
+  .sidebar-go { width: 26px; height: 26px; font-size: 13px; }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-row,
+  .sidebar-title,
+  .sidebar-go,
+  .drag-handle { transition: none !important; }
+  .sidebar-row:hover { transform: none; }
 }

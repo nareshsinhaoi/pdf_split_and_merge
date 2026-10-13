@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="shortcut icon" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico" type="image/x-icon">
-	<link rel="apple-touch-icon" href="https://fea.assettype.com/outlook/outlook-india/assets/apple-touch-icon.png">
-	<link rel="icon" type="image/png" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico">
+  <link rel="apple-touch-icon" href="https://fea.assettype.com/outlook/outlook-india/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="https://fea.assettype.com/outlook/outlook-india/assets/favicon.ico">
   <title>PDF Merger</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
@@ -24,58 +24,82 @@
     </div>
   </header>
 
-  <main class="container">
-    <!-- Upload area -->
-    <section id="uploadSection" class="card">
-      <div id="dropZone" class="drop-zone" tabindex="0">
-        <div class="drop-zone-inner">
-          <div class="drop-icon">⬆️</div>
-          <p class="drop-title">Drag &amp; Drop PDF Files Here</p>
-          <p class="drop-sub">or</p>
-          <button id="selectFilesBtn" class="btn btn-primary" type="button">Select PDF Files</button>
-          <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden />
-          <p class="drop-hint">Only PDF files. Max total upload size 100&nbsp;MB.</p>
+  <!-- Page shell: main content on the left, sticky sidebar on the right -->
+  <div class="page-shell">
+
+    <main class="container main-content">
+      <!-- Mobile-only toggle for the sidebar -->
+      <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle page list">
+        ☰ Pages
+      </button>
+
+      <!-- Upload area -->
+      <section id="uploadSection" class="card">
+        <div id="dropZone" class="drop-zone" tabindex="0">
+          <div class="drop-zone-inner">
+            <div class="drop-icon">⬆️</div>
+            <p class="drop-title">Drag &amp; Drop PDF Files Here</p>
+            <p class="drop-sub">or</p>
+            <button id="selectFilesBtn" class="btn btn-primary" type="button">Select PDF Files</button>
+            <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden />
+            <p class="drop-hint">Only PDF files. Max total upload size 100&nbsp;MB.</p>
+          </div>
         </div>
-      </div>
-      <div id="uploadProgress" class="progress" hidden>
-        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
-        <span id="progressText" class="progress-text">Uploading…</span>
-      </div>
-    </section>
+        <div id="uploadProgress" class="progress" hidden>
+          <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          <span id="progressText" class="progress-text">Uploading…</span>
+        </div>
+      </section>
 
-    <!-- Toolbar -->
-    <section id="toolbar" class="card toolbar" hidden>
-      <div class="toolbar-left">
-        <strong id="pageCountLabel">0 pages</strong>
-        <span id="selectedCount" class="muted" hidden></span>
-      </div>
-      <div class="toolbar-right">
-        <button id="addMoreBtn" class="btn btn-secondary" type="button">+ Add PDF</button>
-        <button id="undoDeleteBtn" class="btn btn-secondary" type="button" hidden>↩ Undo Delete</button>
-        <button id="mergeBtn" class="btn btn-primary" type="button">🔗 Merge &amp; Create PDF</button> 
-        <button id="compressBtn" class="btn btn-secondary" type="button" hidden>🗜 Compress PDF</button>
-      </div>
-    </section>
+      <!-- Toolbar -->
+      <section id="toolbar" class="card toolbar" hidden>
+        <div class="toolbar-left">
+          <strong id="pageCountLabel">0 pages</strong>
+          <span id="selectedCount" class="muted" hidden></span>
+        </div>
+        <div class="toolbar-right">
+          <button id="addMoreBtn" class="btn btn-secondary" type="button">+ Add PDF</button>
+          <button id="undoDeleteBtn" class="btn btn-secondary" type="button" hidden>↩ Undo Delete</button>
+          <button id="mergeBtn" class="btn btn-primary" type="button">🔗 Merge &amp; Create PDF</button>
+          <button id="compressBtn" class="btn btn-secondary" type="button" hidden>🗜 Compress PDF</button>
+        </div>
+      </section>
 
-    <!-- Pages area -->
-    <section id="pagesSection" class="pages-section" hidden>
-      <div id="pagesGrid" class="pages-grid"></div>
-    </section>
+      <!-- Pages grid -->
+      <section id="pagesSection" class="pages-section" hidden>
+        <div id="pagesGrid" class="pages-grid"></div>
+      </section>
 
-    <!-- Success panel -->
-    <section id="successSection" class="card success-card" hidden>
-      <h2>✅ PDF created successfully!</h2>
-      <p id="successInfo" class="muted"></p>
-      <a id="downloadLink" class="btn btn-primary" href="#" download>⬇ Download Final PDF</a>
-    </section>
-  </main>
+      <!-- Success panel -->
+      <section id="successSection" class="card success-card" hidden>
+        <h2>✅ PDF created successfully!</h2>
+        <p id="successInfo" class="muted"></p>
+        <a id="downloadLink" class="btn btn-primary" href="#" download>⬇ Download Final PDF</a>
+      </section>
+    </main>
+
+    <!-- RIGHT-SIDE sticky sidebar (outside <main>) -->
+    <aside id="pageSidebar" class="page-sidebar" aria-label="Page list">
+      <div class="sidebar-head">
+        <strong>Pages</strong>
+        <span id="sidebarCount" class="sidebar-count">0</span>
+      </div>
+      <p id="sidebarEmpty" class="sidebar-empty">
+        Upload a PDF to see pages here.
+      </p>
+      <ul id="sidebarList" class="sidebar-list"></ul>
+      <p class="sidebar-hint">
+        Drag <span class="drag-handle-inline">⋮⋮</span> to reorder · click a title to rename
+      </p>
+    </aside>
+  </div>
 
   <!-- Footer -->
-  <footer class="app-footer"> 
+  <footer class="app-footer">
     <div class="footer-bottom">
       <div class="container footer-bottom-inner">
-        <span>&copy; <span id="footerYear"></span> PDF & Image Toolkit. All rights reserved.</span>
-        <span class="footer-version">@nareshsinha / v1.5.0</span>
+        <span>&copy; <span id="footerYear"></span> PDF &amp; Image Toolkit. All rights reserved.</span>
+        <span class="footer-version">@nareshsinha / v1.7.0</span>
       </div>
     </div>
   </footer>
@@ -102,6 +126,8 @@
 
   <!-- Toast -->
   <div id="toast" class="toast" hidden></div>
+
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 </body>
 </html>
