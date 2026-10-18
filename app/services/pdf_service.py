@@ -137,6 +137,14 @@ def _apply_crop(page: pymupdf.Page, crop: dict | None, context: str = "") -> Non
             context, _rect_tuple(requested), _rect_tuple(mb),
         )
         return
+    # try:
+    #     page.set_cropbox(pymupdf.Rect(cx0, cy0, cx1, cy1))
+    # except ValueError as exc:
+    #     logger.warning(
+    #         "Crop skipped (set_cropbox failed). %s requested=%s safe=(%0.2f,%0.2f,%0.2f,%0.2f) mediabox=%s exc=%s",
+    #         context, _rect_tuple(requested), cx0, cy0, cx1, cy1,
+    #         _rect_tuple(mb), exc,
+    #     )
 
     safe = pymupdf.Rect(cx0, cy0, cx1, cy1)
 

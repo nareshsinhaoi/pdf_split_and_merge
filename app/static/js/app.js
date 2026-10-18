@@ -86,6 +86,9 @@
     selected: new Set(),
     previewIndex: -1,
     previewZoom: 1,
+    // --- crop ---
+    cropMode: false,
+    cropRect: null,   // { x0, y0, x1, y1 } in *image pixel* coordinates
   };
 
   /* ---------- DOM refs ---------- */
@@ -120,6 +123,14 @@
     zoomInBtn: $("#zoomInBtn"),
     zoomOutBtn: $("#zoomOutBtn"),
     closePreviewBtn: $("#closePreviewBtn"),
+
+    cropToggleBtn: $("#cropToggleBtn"),
+    cropClearBtn: $("#cropClearBtn"),
+    cropSaveBtn: $("#cropSaveBtn"),
+    cropOverlay: $("#cropOverlay"),
+    cropBox: $("#cropBox"),
+    cropStage: $("#cropStage"),
+    imageWrap: $("#imageWrap"),
   };
 
   /* ---------- Helpers ---------- */
@@ -277,6 +288,7 @@
     if (state.selected.has(page._id)) card.classList.add("selected");
 
     const rot = page.rotation || 0;
+    // ?ts=${Date.now()}
     card.innerHTML = `
       <div class="page-thumb-wrap">
         <img class="page-thumb"
@@ -470,6 +482,7 @@
   }
 
   function closePreview() {
+    if (state.cropMode) exitCropMode();
     state.previewIndex = -1;
     el.previewModal.hidden = true;
     el.previewImage.src = "";
@@ -496,6 +509,251 @@
       loadPreviewImage(state.previewIndex);
     }
   }
+
+  /* ============================================================
+   CROP TOOL
+   ============================================================ */
+
+let cropDrag = null;   // { mode: 'move'|'resize', handle: string, startX, startY, origRect }
+
+function enterCropMode() {
+  const page = state.pages[state.previewIndex];
+  if (!page) return;
+
+  state.cropMode = true;
+  state.previewZoom = 1;
+  el.previewImage.style.width = "100%";
+
+  el.previewModal.querySelector(".modal-body").classList.add("crop-mode");
+  el.cropToggleBtn.hidden = true;
+  el.cropSaveBtn.hidden = false;
+  el.cropClearBtn.hidden = false;
+
+  // If the page already has a crop, load it. Otherwise start with 10% inset.
+  const img = el.previewImage;
+  const ready = img.complete ? Promise.resolve() : new Promise(r => img.onload = r);
+  ready.then(() => {
+    const W = img.clientWidth;
+    const H = img.clientHeight;
+
+    if (page.crop && page._pageSize) {
+      // Convert stored PDF pts -> image px
+      const sz = page._pageSize;
+      const sx = W / sz.width;
+      const sy = H / sz.height;
+      state.cropRect = {
+        x0: (page.crop.x0 - sz.x0) * sx,
+        y0: (page.crop.y0 - sz.y0) * sy,
+        x1: (page.crop.x1 - sz.x0) * sx,
+        y1: (page.crop.y1 - sz.y0) * sy,
+      };
+    } else {
+      state.cropRect = {
+        x0: W * 0.1, y0: H * 0.1,
+        x1: W * 0.9, y1: H * 0.9,
+      };
+    }
+    el.cropOverlay.hidden = false;
+    paintCropRect();
+    attachCropListeners();
+  });
+}
+
+function exitCropMode() {
+  state.cropMode = false;
+  state.cropRect = null;
+  el.previewModal.querySelector(".modal-body").classList.remove("crop-mode");
+  el.cropToggleBtn.hidden = false;
+  el.cropSaveBtn.hidden = true;
+  el.cropClearBtn.hidden = true;
+  el.cropOverlay.hidden = true;
+  detachCropListeners();
+}
+
+function paintCropRect() {
+  const r = state.cropRect;
+  if (!r) return;
+  el.cropBox.style.left = `${r.x0}px`;
+  el.cropBox.style.top = `${r.y0}px`;
+  el.cropBox.style.width = `${r.x1 - r.x0}px`;
+  el.cropBox.style.height = `${r.y1 - r.y0}px`;
+}
+
+function clampCropRect(rect) {
+  const W = el.previewImage.clientWidth;
+  const H = el.previewImage.clientHeight;
+  const MIN = 30; // minimum crop size in px
+  let { x0, y0, x1, y1 } = rect;
+  if (x0 > x1) [x0, x1] = [x1, x0];
+  if (y0 > y1) [y0, y1] = [y1, y0];
+  x0 = Math.max(0, Math.min(x0, W - MIN));
+  y0 = Math.max(0, Math.min(y0, H - MIN));
+  x1 = Math.max(x0 + MIN, Math.min(x1, W));
+  y1 = Math.max(y0 + MIN, Math.min(y1, H));
+  return { x0, y0, x1, y1 };
+}
+
+function attachCropListeners() {
+  el.cropBox.addEventListener("mousedown", onCropMouseDown);
+  el.cropBox.addEventListener("touchstart", onCropTouchStart, { passive: false });
+  el.cropOverlay.querySelectorAll(".crop-handle").forEach(h => {
+    h.addEventListener("mousedown", (e) => onHandleMouseDown(e, h.dataset.handle));
+    h.addEventListener("touchstart",
+      (e) => onHandleTouchStart(e, h.dataset.handle), { passive: false });
+  });
+}
+
+function detachCropListeners() {
+  el.cropBox.removeEventListener("mousedown", onCropMouseDown);
+  el.cropBox.removeEventListener("touchstart", onCropTouchStart);
+  el.cropOverlay.querySelectorAll(".crop-handle").forEach(h => {
+    h.replaceWith(h.cloneNode(true));  // cheap detach
+  });
+}
+
+/* --- move --- */
+function onCropMouseDown(e) {
+  e.preventDefault();
+  startDrag("move", null, e.clientX, e.clientY);
+  window.addEventListener("mousemove", onDragMove);
+  window.addEventListener("mouseup", onDragEnd);
+}
+function onCropTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  startDrag("move", null, t.clientX, t.clientY);
+  window.addEventListener("touchmove", onDragMoveTouch, { passive: false });
+  window.addEventListener("touchend", onDragEnd);
+}
+
+/* --- resize --- */
+function onHandleMouseDown(e, handle) {
+  e.preventDefault(); e.stopPropagation();
+  startDrag("resize", handle, e.clientX, e.clientY);
+  window.addEventListener("mousemove", onDragMove);
+  window.addEventListener("mouseup", onDragEnd);
+}
+function onHandleTouchStart(e, handle) {
+  e.preventDefault(); e.stopPropagation();
+  const t = e.touches[0];
+  startDrag("resize", handle, t.clientX, t.clientY);
+  window.addEventListener("touchmove", onDragMoveTouch, { passive: false });
+  window.addEventListener("touchend", onDragEnd);
+}
+
+function startDrag(mode, handle, x, y) {
+  cropDrag = {
+    mode, handle,
+    startX: x, startY: y,
+    origRect: { ...state.cropRect },
+  };
+}
+
+function onDragMove(e) {
+  if (!cropDrag) return;
+  updateDrag(e.clientX, e.clientY);
+}
+function onDragMoveTouch(e) {
+  if (!cropDrag) return;
+  const t = e.touches[0];
+  updateDrag(t.clientX, t.clientY);
+}
+
+function updateDrag(x, y) {
+  const dx = x - cropDrag.startX;
+  const dy = y - cropDrag.startY;
+  const o = cropDrag.origRect;
+  let r;
+
+  if (cropDrag.mode === "move") {
+    r = { x0: o.x0 + dx, y0: o.y0 + dy, x1: o.x1 + dx, y1: o.y1 + dy };
+    // Clamp to image bounds
+    const W = el.previewImage.clientWidth;
+    const H = el.previewImage.clientHeight;
+    const w = r.x1 - r.x0, h = r.y1 - r.y0;
+    if (r.x0 < 0) { r.x0 = 0; r.x1 = w; }
+    if (r.y0 < 0) { r.y0 = 0; r.y1 = h; }
+    if (r.x1 > W) { r.x1 = W; r.x0 = W - w; }
+    if (r.y1 > H) { r.y1 = H; r.y0 = H - h; }
+  } else {
+    r = { ...o };
+    if (cropDrag.handle.includes("w")) r.x0 = o.x0 + dx;
+    if (cropDrag.handle.includes("e")) r.x1 = o.x1 + dx;
+    if (cropDrag.handle.includes("n")) r.y0 = o.y0 + dy;
+    if (cropDrag.handle.includes("s")) r.y1 = o.y1 + dy;
+  }
+
+  state.cropRect = clampCropRect(r);
+  paintCropRect();
+}
+
+function onDragEnd() {
+  cropDrag = null;
+  window.removeEventListener("mousemove", onDragMove);
+  window.removeEventListener("mouseup", onDragEnd);
+  window.removeEventListener("touchmove", onDragMoveTouch);
+  window.removeEventListener("touchend", onDragEnd);
+}
+
+/* --- save / clear --- */
+async function saveCrop() {
+  const page = state.pages[state.previewIndex];
+  if (!page || !state.cropRect) return;
+
+  // Convert image px -> PDF pts using the page's natural size.
+  // We fetch the size if we don't already have it.
+  let sz = page._pageSize;
+  if (!sz) {
+    try {
+      sz = await API.getPageSize(page._id);
+      page._pageSize = sz;
+    } catch (e) {
+      toast(e.message, "error");
+      return;
+    }
+  }
+
+  const imgW = el.previewImage.clientWidth;
+  const imgH = el.previewImage.clientHeight;
+  const sx = sz.width / imgW;
+  const sy = sz.height / imgH;
+  const r = state.cropRect;
+
+  const crop = {
+    x0: sz.x0 + r.x0 * sx,
+    y0: sz.y0 + r.y0 * sy,
+    x1: sz.x0 + r.x1 * sx,
+    y1: sz.y0 + r.y1 * sy,
+  };
+
+  try {
+    await API.updatePage(page._id, { crop });
+    page.crop = crop;
+    // Bust the thumbnail cache
+    renderPages();
+    toast("Crop saved", "success");
+    exitCropMode();
+    // Reload preview so user sees the cropped result
+    loadPreviewImage(state.previewIndex);
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
+
+async function clearCrop() {
+  const page = state.pages[state.previewIndex];
+  if (!page) return;
+  try {
+    await API.updatePage(page._id, { crop: null });
+    page.crop = null;
+    renderPages();
+    toast("Crop cleared", "success");
+    exitCropMode();
+    loadPreviewImage(state.previewIndex);
+  } catch (e) {
+    toast(e.message, "error");
+  }
+}
 
   /* ---------- Merge ---------- */
   async function mergeProject() {
@@ -627,10 +885,18 @@
 
     document.addEventListener("keydown", (e) => {
       if (el.previewModal.hidden) return;
+      if (state.cropMode) {
+        if (e.key === "Escape") exitCropMode();
+        return;
+      }
       if (e.key === "Escape") closePreview();
       if (e.key === "ArrowLeft") previewPrev();
       if (e.key === "ArrowRight") previewNext();
     });
+
+    el.cropToggleBtn.addEventListener("click", enterCropMode);
+    el.cropSaveBtn.addEventListener("click", saveCrop);
+    el.cropClearBtn.addEventListener("click", clearCrop);
 
     // When the sidebar reorders, reload the grid.
     document.addEventListener("pages:refresh", async () => {

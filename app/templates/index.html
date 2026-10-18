@@ -115,11 +115,28 @@
           <button id="zoomOutBtn" class="btn btn-icon" title="Zoom out">−</button>
           <button id="zoomInBtn" class="btn btn-icon" title="Zoom in">+</button>
           <button id="nextPageBtn" class="btn btn-icon" title="Next">›</button>
+            <button id="cropToggleBtn" class="btn btn-icon" title="Crop this page">✂</button>
+            <button id="cropClearBtn" class="btn btn-icon" title="Clear crop" hidden>✖</button>
+            <button id="cropSaveBtn" class="btn btn-primary btn-sm" title="Save crop" hidden>Save</button>
           <button id="closePreviewBtn" class="btn btn-icon" title="Close">✕</button>
         </div>
       </div>
-      <div class="modal-image-wrap">
-        <img id="previewImage" alt="Page preview" />
+      <div class="modal-image-wrap" id="imageWrap">
+        <div class="crop-stage" id="cropStage">
+          <img id="previewImage" alt="Page preview" draggable="false" />
+          <div class="crop-overlay" id="cropOverlay" hidden>
+            <div class="crop-box" id="cropBox">
+              <div class="crop-handle nw" data-handle="nw"></div>
+              <div class="crop-handle ne" data-handle="ne"></div>
+              <div class="crop-handle sw" data-handle="sw"></div>
+              <div class="crop-handle se" data-handle="se"></div>
+              <div class="crop-dim tl"></div>
+              <div class="crop-dim tr"></div>
+              <div class="crop-dim bl"></div>
+              <div class="crop-dim br"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

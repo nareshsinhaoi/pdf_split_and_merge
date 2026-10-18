@@ -46,6 +46,7 @@ def merge_project(project_id):
             kind_hint="auto",
             page_id=str(p["_id"]),
             project_id=project_id,
+            #skip_if_junk=True,
         ))
 
     if not specs:

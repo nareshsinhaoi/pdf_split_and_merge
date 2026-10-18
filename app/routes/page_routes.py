@@ -84,44 +84,49 @@ def list_pages(project_id):
 #     updated = page_repo.get_page(page_id)
 #     return jsonify(serialize_doc(updated)), 200
 
-@page_bp.route("/pages/<page_id>", methods=["PUT"])
-def update_page(page_id):
-    """Update rotation, deleted flag, or custom title."""
-    data = request.get_json(silent=True) or {}
-    update = {}
+##########################################
+####     below is version 2 
+##########################################
 
-    if "rotation" in data:
-        try:
-            rot = int(data["rotation"]) % 360
-        except (TypeError, ValueError):
-            return jsonify({"error": "rotation must be an integer"}), 400
-        if rot not in (0, 90, 180, 270):
-            return jsonify({"error": "rotation must be 0, 90, 180 or 270"}), 400
-        update["rotation"] = rot
 
-    if "deleted" in data:
-        update["deleted"] = bool(data["deleted"])
+# @page_bp.route("/pages/<page_id>", methods=["PUT"])
+# def update_page(page_id):
+#     """Update rotation, deleted flag, or custom title."""
+#     data = request.get_json(silent=True) or {}
+#     update = {}
 
-    # NEW: custom display title for the sidebar
-    if "title" in data:
-        title = data["title"]
-        if title is None:
-            update["title"] = None
-        elif isinstance(title, str):
-            update["title"] = title.strip()[:200]
-        else:
-            return jsonify({"error": "title must be a string"}), 400
+#     if "rotation" in data:
+#         try:
+#             rot = int(data["rotation"]) % 360
+#         except (TypeError, ValueError):
+#             return jsonify({"error": "rotation must be an integer"}), 400
+#         if rot not in (0, 90, 180, 270):
+#             return jsonify({"error": "rotation must be 0, 90, 180 or 270"}), 400
+#         update["rotation"] = rot
 
-    if not update:
-        return jsonify({"error": "No valid fields provided"}), 400
+#     if "deleted" in data:
+#         update["deleted"] = bool(data["deleted"])
 
-    page = page_repo.get_page(page_id)
-    if not page:
-        return jsonify({"error": "Page not found"}), 404
+#     # NEW: custom display title for the sidebar
+#     if "title" in data:
+#         title = data["title"]
+#         if title is None:
+#             update["title"] = None
+#         elif isinstance(title, str):
+#             update["title"] = title.strip()[:200]
+#         else:
+#             return jsonify({"error": "title must be a string"}), 400
 
-    page_repo.update_page(page_id, update)
-    updated = page_repo.get_page(page_id)
-    return jsonify(serialize_doc(updated)), 200
+#     if not update:
+#         return jsonify({"error": "No valid fields provided"}), 400
+
+#     page = page_repo.get_page(page_id)
+#     if not page:
+#         return jsonify({"error": "Page not found"}), 404
+
+#     page_repo.update_page(page_id, update)
+#     updated = page_repo.get_page(page_id)
+#     return jsonify(serialize_doc(updated)), 200
 
 @page_bp.route("/pages/<page_id>", methods=["DELETE"])
 def delete_page(page_id):
@@ -281,3 +286,88 @@ def page_size(page_id):
             "x1": crop["x1"], "y1": crop["y1"],
         }
     return jsonify(size), 200
+
+@page_bp.route("/pages/<page_id>", methods=["PUT"])
+def update_page(page_id):
+    """Update rotation, deleted flag, or crop rectangle."""
+    data = request.get_json(silent=True) or {}
+    update = {}
+
+    # --- rotation ---
+    if "rotation" in data:
+        try:
+            rot = int(data["rotation"]) % 360
+        except (TypeError, ValueError):
+            return jsonify({"error": "rotation must be an integer"}), 400
+        if rot not in (0, 90, 180, 270):
+            return jsonify({"error": "rotation must be 0, 90, 180 or 270"}), 400
+        update["rotation"] = rot
+
+    # --- deleted ---
+    if "deleted" in data:
+        update["deleted"] = bool(data["deleted"])
+
+    # --- crop (new) ---
+    if "crop" in data:
+        raw = data["crop"]
+        if raw is None:
+            update["crop"] = None
+        elif isinstance(raw, dict):
+            # Expect: {"x0": float, "y0": float, "x1": float, "y1": float}
+            try:
+                x0 = float(raw["x0"])
+                y0 = float(raw["y0"])
+                x1 = float(raw["x1"])
+                y1 = float(raw["y1"])
+            except (KeyError, TypeError, ValueError):
+                return jsonify({
+                    "error": "crop must be {x0,y0,x1,y1} numeric or null"
+                }), 400
+
+            # Normalize ordering
+            if x0 > x1: x0, x1 = x1, x0
+            if y0 > y1: y0, y1 = y1, y0
+
+            if x1 - x0 < 1 or y1 - y0 < 1:
+                return jsonify({
+                    "error": "crop rectangle too small (min 1pt per side)"
+                }), 400
+
+            update["crop"] = {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
+        else:
+            return jsonify({"error": "crop must be an object or null"}), 400
+
+    if not update:
+        return jsonify({"error": "No valid fields provided"}), 400
+
+    page = page_repo.get_page(page_id)
+    if not page:
+        return jsonify({"error": "Page not found"}), 404
+
+    # Validate crop is inside the source's MediaBox
+    if "crop" in update and update["crop"] is not None:
+        fdoc = file_repo.get_file(str(page["file_id"]))
+        if not fdoc:
+            return jsonify({"error": "Source file missing"}), 404
+        try:
+            size = pdf_service.get_page_size(
+                fdoc["file_path"], page["original_page_number"]
+            )
+            # size = {width, height, x0, y0, x1, y1}
+            c = update["crop"]
+            if (c["x0"] < size["x0"] - 0.5 or c["y0"] < size["y0"] - 0.5
+                    or c["x1"] > size["x1"] + 0.5 or c["y1"] > size["y1"] + 0.5):
+                return jsonify({
+                    "error": "crop rectangle is outside the page bounds",
+                    "page_bounds": {
+                        "x0": size["x0"], "y0": size["y0"],
+                        "x1": size["x1"], "y1": size["y1"],
+                    },
+                    "crop": c,
+                }), 400
+        except pdf_service.PDFProcessingError as exc:
+            return jsonify({"error": f"Cannot validate crop: {exc}"}), 500
+
+    page_repo.update_page(page_id, update)
+    updated = page_repo.get_page(page_id)
+    return jsonify(serialize_doc(updated)), 200

@@ -59,3 +59,7 @@ class Config:
     TEMPLATE_FOLDER = str(APP_ROOT / "app" / "templates")
     STATIC_FOLDER = str(APP_ROOT / "app" / "static")
     IMAGES_FOLDER = str(WRITABLE_ROOT / os.environ.get("IMAGES_FOLDER", "images"))
+    
+    APP_VERSION = "1.2.0"
+    APP_COPYRIGHT = "© 2026 Image Toolkit. All rights reserved."
+    APP_AUTHOR = "@nareshsinha"
