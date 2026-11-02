@@ -8,6 +8,11 @@ and quality.
 **Stack:** Flask · PyMuPDF (fitz) · MongoDB · Vanilla HTML/CSS/JS
 
 ---
+## Application Preview
+
+![Photo Editor](/static/screenshot.png)
+
+---
 
 ## 1. Features
 
