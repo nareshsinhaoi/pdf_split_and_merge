@@ -10,7 +10,7 @@ and quality.
 ---
 ## Application Preview
 
-![Photo Editor](/static/screenshot.png)
+![PDF Merger App](/app/static/screenshot.png)
 
 ---
 
